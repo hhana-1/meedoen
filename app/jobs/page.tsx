@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { useAuth } from '@/contexts/AuthContext'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 
@@ -23,6 +24,7 @@ type Job = {
 
 export default function JobsPage() {
   const { t, dir } = useLanguage()
+  const { user } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -87,7 +89,7 @@ export default function JobsPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {jobs.map(job => <JobCard key={job.id} job={job} t={t} />)}
+            {jobs.map(job => <JobCard key={job.id} job={job} t={t} isEmployer={user?.role === 'employer'} />)}
           </div>
         )}
       </div>
@@ -95,7 +97,7 @@ export default function JobsPage() {
   )
 }
 
-function JobCard({ job, t }: { job: Job; t: (k: string) => string }) {
+function JobCard({ job, t, isEmployer }: { job: Job; t: (k: string) => string; isEmployer?: boolean }) {
   const timeAgo = (date: string) => {
     const days = Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
     if (days === 0) return 'Today'
@@ -138,11 +140,13 @@ function JobCard({ job, t }: { job: Job; t: (k: string) => string }) {
             <span>🕐 {timeAgo(job.createdAt)}</span>
           </div>
         </div>
-        <div className="flex-shrink-0">
-          <span className="bg-orange-500 text-white text-sm px-4 py-2 rounded-lg font-medium group-hover:bg-orange-600 transition-colors">
-            {t('applyNow')}
-          </span>
-        </div>
+        {!isEmployer && (
+          <div className="flex-shrink-0">
+            <span className="bg-orange-500 text-white text-sm px-4 py-2 rounded-lg font-medium group-hover:bg-orange-600 transition-colors">
+              {t('applyNow')}
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   )
