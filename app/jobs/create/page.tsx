@@ -18,6 +18,7 @@ export default function CreateJobPage() {
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
   const [hours, setHours] = useState('')
+  const [durationWeeks, setDurationWeeks] = useState('')
   const [salary, setSalary] = useState('')
   const [category, setCategory] = useState(CATEGORIES[0])
   const [jobType, setJobType] = useState('regular')
@@ -26,9 +27,21 @@ export default function CreateJobPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Payment step
+  const [paymentStep, setPaymentStep] = useState(false)
+  const [checkoutUrl, setCheckoutUrl] = useState('')
+  const [paymentId, setPaymentId] = useState('')
+  const [jobId, setJobId] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('')
+  const [checking, setChecking] = useState(false)
+
   useEffect(() => {
     if (!loading && (!user || user.role !== 'employer')) router.push('/login')
   }, [user, loading, router])
+
+  const totalCost = hours && durationWeeks && salary
+    ? parseFloat(hours) * parseFloat(durationWeeks) * parseFloat(salary)
+    : null
 
   function toggleShift(s: string) {
     setSelectedShifts(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
@@ -52,14 +65,109 @@ export default function CreateJobPage() {
         requirements: requirements.filter(Boolean),
       }),
     })
+
+    const jobData = await res.json()
     setSubmitting(false)
-    if (res.ok) {
-      const job = await res.json()
-      router.push(`/jobs/${job.id}`)
-    } else {
-      const data = await res.json()
-      setError(data.error || t('error'))
+
+    if (!res.ok) {
+      setError(jobData.error || t('error'))
+      return
     }
+
+    if (jobData.requirePayment && totalCost) {
+      const payRes = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: jobData.id, jobTitle: title, amount: totalCost }),
+      })
+      const payData = await payRes.json()
+      if (payRes.ok) {
+        setJobId(jobData.id)
+        setCheckoutUrl(payData.checkoutUrl)
+        setPaymentId(payData.paymentId)
+        setPaymentStep(true)
+      } else {
+        setError(payData.error || 'Payment creation failed')
+      }
+    } else {
+      router.push(`/jobs/${jobData.id}`)
+    }
+  }
+
+  async function checkPaymentStatus() {
+    if (!paymentId) return
+    setChecking(true)
+    const res = await fetch(`/api/payments/${paymentId}`)
+    const data = await res.json()
+    setChecking(false)
+    setPaymentStatus(data.status)
+    if (data.status === 'paid') {
+      setTimeout(() => router.push(`/jobs/${jobId}`), 1500)
+    }
+  }
+
+  const qrUrl = checkoutUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(checkoutUrl)}`
+    : ''
+
+  if (paymentStep) {
+    return (
+      <div dir={dir} className="min-h-screen flex flex-col bg-gray-50">
+        <Navbar />
+        <div className="max-w-lg mx-auto px-4 py-10 w-full">
+          <div className="bg-white rounded-2xl shadow p-8 text-center">
+            <div className="text-4xl mb-3">💳</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-1">Complete payment</h1>
+            <p className="text-gray-500 mb-2 text-sm">Your job listing will go live after payment is confirmed.</p>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-6 py-4 mb-6 inline-block">
+              <p className="text-sm text-gray-500">Total amount</p>
+              <p className="text-3xl font-bold text-orange-600">€{totalCost?.toFixed(2)}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {hours} hrs × {durationWeeks} weeks × €{parseFloat(salary || '0').toFixed(2)}/hr
+              </p>
+            </div>
+
+            {qrUrl && (
+              <div className="flex justify-center mb-6">
+                <div className="border-2 border-gray-200 rounded-2xl p-3 inline-block">
+                  <img src={qrUrl} alt="Payment QR code" className="w-56 h-56" />
+                </div>
+              </div>
+            )}
+
+            <p className="text-sm text-gray-500 mb-4">Scan the QR code or tap the button below to pay</p>
+
+            <a
+              href={checkoutUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors mb-3"
+            >
+              Open payment page →
+            </a>
+
+            {paymentStatus === 'paid' ? (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm font-semibold">
+                ✅ Payment confirmed! Redirecting to your job listing...
+              </div>
+            ) : paymentStatus && paymentStatus !== 'open' && paymentStatus !== 'pending' ? (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                Payment status: {paymentStatus}. Please try again.
+              </div>
+            ) : (
+              <button
+                onClick={checkPaymentStatus}
+                disabled={checking}
+                className="w-full border border-gray-300 text-gray-600 py-3 rounded-xl font-medium hover:bg-gray-50 disabled:opacity-50 text-sm"
+              >
+                {checking ? 'Checking...' : 'I have paid — check status'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -115,8 +223,18 @@ export default function CreateJobPage() {
             <h2 className="font-bold text-gray-700">{t('detailsSection')}</h2>
             <Field label={t('location')} value={location} onChange={setLocation} placeholder="e.g. Amsterdam" />
             <div className="grid grid-cols-2 gap-4">
-              <Field label={t('hrsWeekLabel')} value={hours} onChange={setHours} type="number" placeholder="e.g. 24" />
-              <Field label={`${t('salary')} (€/hr)`} value={salary} onChange={setSalary} type="number" placeholder="e.g. 13.50" />
+              <Field label={`${t('hrsWeekLabel')} *`} value={hours} onChange={setHours} type="number" placeholder="e.g. 24" required />
+              <Field label="Duration (weeks) *" value={durationWeeks} onChange={setDurationWeeks} type="number" placeholder="e.g. 4" required />
+              <Field label={`${t('salary')} (€/hr) *`} value={salary} onChange={setSalary} type="number" placeholder="e.g. 13.50" required />
+              <div className="flex flex-col justify-end">
+                {totalCost !== null && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-center">
+                    <p className="text-xs text-gray-500 mb-0.5">Total wages</p>
+                    <p className="text-xl font-bold text-orange-600">€{totalCost.toFixed(2)}</p>
+                    <p className="text-xs text-gray-400">{hours}h × {durationWeeks}w × €{parseFloat(salary).toFixed(2)}</p>
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">{t('preferredShifts')}</label>
@@ -153,13 +271,19 @@ export default function CreateJobPage() {
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
-            <strong>Note:</strong> {t('volunteerNote')}
-          </div>
+          {totalCost !== null && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-blue-800">Total wage cost</p>
+                <p className="text-xs text-blue-600">{hours} hrs/week × {durationWeeks} weeks × €{parseFloat(salary).toFixed(2)}/hr</p>
+              </div>
+              <p className="text-2xl font-bold text-blue-700">€{totalCost.toFixed(2)}</p>
+            </div>
+          )}
 
           <button type="submit" disabled={submitting}
             className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-orange-600 disabled:opacity-60 transition-colors">
-            {submitting ? t('loading') : t('postJob')}
+            {submitting ? t('loading') : totalCost ? `Post & Pay €${totalCost.toFixed(2)}` : t('postJob')}
           </button>
         </form>
       </div>

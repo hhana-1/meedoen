@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
   const employer = await prisma.employerProfile.findUnique({ where: { userId: session.userId } })
   if (!employer) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
+  const requirePayment = !!process.env.MOLLIE_API_KEY
+
   const job = await prisma.jobListing.create({
     data: {
       employerId: employer.id,
@@ -83,7 +85,8 @@ export async function POST(req: NextRequest) {
       salaryMax: salaryMax || null,
       category: category || null,
       jobType: jobType || 'regular',
+      active: !requirePayment,
     },
   })
-  return NextResponse.json(job, { status: 201 })
+  return NextResponse.json({ ...job, requirePayment }, { status: 201 })
 }
