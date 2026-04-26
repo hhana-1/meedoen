@@ -1,0 +1,196 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid()) @map("_id")
+  email     String   @unique
+  password  String
+  role      String
+  language  String   @default("en")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobSeekerProfile JobSeekerProfile?
+  employerProfile  EmployerProfile?
+  reviewsGiven     Review[]      @relation("ReviewFrom")
+  reviewsReceived  Review[]      @relation("ReviewTo")
+  applications     Application[]
+}
+
+model JobSeekerProfile {
+  id            String  @id @default(cuid()) @map("_id")
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id])
+  name          String?
+  phone         String?
+  vnr           String? @unique
+  dateOfBirth   String?
+  nationality   String?
+  docNumber     String?
+  docValidUntil String?
+  picture       String?
+  bio           String?
+  age           Int?
+  experience    String?
+  education     String?
+  languages     String?
+  hoursPerWeek  Int?
+  shifts        String?
+  linkedin      String?
+  instagram     String?
+  twitter       String?
+  facebook      String?
+  services      ServiceListing[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model EmployerProfile {
+  id          String  @id @default(cuid()) @map("_id")
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id])
+  companyName String
+  description String?
+  logo        String?
+  website     String?
+  verified    Boolean @default(false)
+  orgType     String?
+  kvkNumber   String?
+  address     String?
+  phone       String?
+  jobListings JobListing[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model JobListing {
+  id           String  @id @default(cuid()) @map("_id")
+  employerId   String
+  employer     EmployerProfile @relation(fields: [employerId], references: [id])
+  title        String
+  description  String
+  requirements String?
+  location     String?
+  hoursPerWeek Int?
+  shifts       String?
+  salaryMin    Float?
+  salaryMax    Float?
+  category     String?
+  jobType      String  @default("regular")
+  stages       String?
+  active       Boolean @default(true)
+  applications Application[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ServiceListing {
+  id          String  @id @default(cuid()) @map("_id")
+  profileId   String
+  profile     JobSeekerProfile @relation(fields: [profileId], references: [id])
+  serviceType String
+  description String?
+  approved    Boolean @default(true)
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ServiceRequest {
+  id          String @id @default(cuid()) @map("_id")
+  serviceType String
+  description String?
+  requestedBy String
+  status      String @default("pending")
+  createdAt   DateTime @default(now())
+}
+
+model Application {
+  id           String     @id @default(cuid()) @map("_id")
+  jobListingId String
+  jobListing   JobListing @relation(fields: [jobListingId], references: [id])
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  status       String     @default("applied")
+  stage        String     @default("applied")
+  coverLetter  String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Review {
+  id         String @id @default(cuid()) @map("_id")
+  fromUserId String
+  from       User   @relation("ReviewFrom", fields: [fromUserId], references: [id])
+  toUserId   String
+  to         User   @relation("ReviewTo", fields: [toUserId], references: [id])
+  rating     Int
+  comment    String
+  flagged    Boolean @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model ModerationLog {
+  id          String @id @default(cuid()) @map("_id")
+  contentType String
+  contentId   String
+  reason      String
+  action      String @default("flagged")
+  createdAt   DateTime @default(now())
+}
+
+// ── Embedded types ────────────────────────────────────────────────────────────
+
+type Address {
+  street     String?
+  city       String?
+  postalCode String?
+  country    String?
+}
+
+type CandidateReview {
+  companyId String
+  stars     Int
+}
+
+type CompanyReview {
+  candidateId String
+  stars       Int
+}
+
+// ── New collections ───────────────────────────────────────────────────────────
+
+model Candidate {
+  id           String            @id @default(auto()) @map("_id") @db.ObjectId
+  firstName    String
+  lastName     String
+  vNumber      String            @unique
+  phoneNumber  String?
+  emailAddress String            @unique
+  address      Address?
+  reviews      CandidateReview[]
+  skills       String[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model Company {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  companyName  String
+  kvkNumber    String         @unique
+  emailAddress String         @unique
+  password     String
+  address      Address?
+  reviews      CompanyReview[]
+  jobOfferings String[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
