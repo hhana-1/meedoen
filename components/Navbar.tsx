@@ -68,7 +68,7 @@ export default function Navbar() {
                 <Link href="/login" className="text-gray-600 hover:text-orange-500 font-medium transition-colors">
                   {t('login')}
                 </Link>
-                <Link href="/register" className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 font-medium transition-colors">
+                <Link href="/register" className="text-gray-600 hover:text-orange-500 font-medium transition-colors">
                   {t('register')}
                 </Link>
               </>

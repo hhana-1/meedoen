@@ -52,14 +52,14 @@ export default function LoginPage() {
               onClick={() => switchRole('jobseeker')}
               className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-colors ${role === 'jobseeker' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:text-gray-800'}`}
             >
-              👤 {t('lookingForJob')}
+              👤 Login as job seeker
             </button>
             <button
               type="button"
               onClick={() => switchRole('employer')}
               className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-colors ${role === 'employer' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:text-gray-800'}`}
             >
-              🏢 {t('registerEmployer')}
+              🏢 Login as employer
             </button>
           </div>
 
