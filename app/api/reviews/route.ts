@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const reviews = await prisma.review.findMany({
     where: { toUserId, flagged: false },
     include: {
-      from: { select: { id: true, role: true, employerProfile: { select: { companyName: true } } } },
+      from: { select: { id: true, role: true, employerProfile: { select: { companyName: true } }, jobSeekerProfile: { select: { name: true } } } },
     },
     orderBy: { createdAt: 'desc' },
   })

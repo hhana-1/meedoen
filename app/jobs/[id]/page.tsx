@@ -23,6 +23,14 @@ type Job = {
   _count: { applications: number }
 }
 
+type Review = {
+  id: string
+  rating: number
+  comment: string
+  createdAt: string
+  from: { id: string; role: string; jobSeekerProfile: { name: string | null } | null }
+}
+
 export default function JobDetailPage() {
   const { id } = useParams() as { id: string }
   const { user } = useAuth()
@@ -43,14 +51,48 @@ export default function JobDetailPage() {
   const [coverLetter, setCoverLetter] = useState('')
   const [showApplyForm, setShowApplyForm] = useState(false)
   const [error, setError] = useState('')
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState('')
+  const [submittingReview, setSubmittingReview] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const [reviewSuccess, setReviewSuccess] = useState(false)
 
   useEffect(() => {
     fetch(`/api/jobs/${id}`).then(r => r.json()).then(data => {
       if (data.error) router.push('/jobs')
-      else setJob(data)
+      else {
+        setJob(data)
+        fetch(`/api/reviews?toUserId=${data.employer.userId}`)
+          .then(r => r.json()).then(setReviews)
+      }
       setLoading(false)
     })
   }, [id, router])
+
+  async function submitReview(e: React.FormEvent) {
+    e.preventDefault()
+    if (!job) return
+    setSubmittingReview(true)
+    setReviewError('')
+    const res = await fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ toUserId: job.employer.userId, rating: reviewRating, comment: reviewComment }),
+    })
+    setSubmittingReview(false)
+    if (res.ok) {
+      const newReview = await res.json()
+      setReviews(prev => [{ ...newReview, from: { id: user!.id, role: user!.role, jobSeekerProfile: null } }, ...prev])
+      setReviewSuccess(true)
+      setReviewComment('')
+    } else {
+      const data = await res.json()
+      setReviewError(data.error || t('error'))
+    }
+  }
+
+  const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : null
 
   async function applyForJob() {
     if (!user) { router.push('/login'); return }
@@ -186,7 +228,7 @@ export default function JobDetailPage() {
           ) : null}
         </div>
 
-        <div className="bg-white rounded-2xl shadow p-6">
+        <div className="bg-white rounded-2xl shadow p-6 mb-6">
           <h2 className="font-bold text-gray-800 mb-3">{t('companyProfile')}</h2>
           <Link href={`/employer/${job.employer.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             {job.employer.logo && <img src={job.employer.logo} alt="" className="w-12 h-12 rounded-lg object-cover" />}
@@ -195,6 +237,77 @@ export default function JobDetailPage() {
               {job.employer.description && <p className="text-gray-500 text-sm line-clamp-2">{job.employer.description}</p>}
             </div>
           </Link>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-bold text-gray-800 text-lg">Reviews for {job.employer.companyName}</h2>
+              {avgRating !== null && (
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex text-yellow-400">
+                    {[1,2,3,4,5].map(s => <span key={s}>{s <= Math.round(avgRating) ? '★' : '☆'}</span>)}
+                  </div>
+                  <span className="text-gray-600 font-semibold">{avgRating.toFixed(1)}</span>
+                  <span className="text-gray-400 text-sm">({reviews.length} {t('reviews').toLowerCase()})</span>
+                </div>
+              )}
+            </div>
+            <Link href={`/employer/${job.employer.id}/reviews`} className="text-orange-500 text-sm hover:underline">{t('viewAll')}</Link>
+          </div>
+
+          {user && user.id !== job.employer.userId && !reviewSuccess && (
+            <div className="border border-gray-200 rounded-xl p-5 mb-6 bg-gray-50">
+              <h3 className="font-semibold text-gray-800 mb-3">{t('writeReview')}</h3>
+              {reviewError && <div className="bg-red-50 text-red-700 border border-red-200 px-3 py-2 rounded-lg text-sm mb-3">{reviewError}</div>}
+              <form onSubmit={submitReview} className="flex flex-col gap-3">
+                <div className="flex gap-1">
+                  {[1,2,3,4,5].map(s => (
+                    <button type="button" key={s} onClick={() => setReviewRating(s)}
+                      className={`text-3xl transition-colors ${s <= reviewRating ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-400`}>★</button>
+                  ))}
+                </div>
+                <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} required rows={3}
+                  placeholder="Share your experience with this employer..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+                <button type="submit" disabled={submittingReview}
+                  className="bg-orange-500 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-60 text-sm">
+                  {submittingReview ? t('loading') : t('submit')}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {reviewSuccess && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm text-center mb-6">✅ Review submitted!</div>
+          )}
+
+          {!user && (
+            <div className="text-center py-3 mb-4">
+              <Link href="/login" className="text-orange-500 hover:underline text-sm">{t('login')} to leave a review</Link>
+            </div>
+          )}
+
+          {reviews.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-6">{t('noReviews')}</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {reviews.map(r => (
+                <div key={r.id} className="border-t border-gray-100 pt-4 first:border-0 first:pt-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex text-yellow-400 text-sm">
+                      {[1,2,3,4,5].map(s => <span key={s}>{s <= r.rating ? '★' : '☆'}</span>)}
+                    </div>
+                    <span className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-gray-700 leading-relaxed text-sm">{r.comment}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    — {r.from.role === 'jobseeker' ? (r.from.jobSeekerProfile?.name || 'Job seeker') : 'Employer'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

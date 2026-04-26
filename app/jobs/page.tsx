@@ -17,7 +17,7 @@ type Job = {
   category: string | null
   jobType: string
   createdAt: string
-  employer: { companyName: string; verified: boolean; logo: string | null; userId: string }
+  employer: { companyName: string; verified: boolean; logo: string | null; userId: string; avgRating: number | null; reviewCount: number }
   _count: { applications: number }
 }
 
@@ -115,7 +115,15 @@ function JobCard({ job, t }: { job: Job; t: (k: string) => string }) {
             }
             {job.category && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{job.category}</span>}
           </div>
-          <h2 className="text-xl font-bold text-gray-800 group-hover:text-orange-500 transition-colors">{job.title}</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-xl font-bold text-gray-800 group-hover:text-orange-500 transition-colors">{job.title}</h2>
+            {job.employer.avgRating !== null && (
+              <span className="flex items-center gap-0.5 text-sm text-yellow-500 font-medium">
+                {'★'.repeat(Math.round(job.employer.avgRating))}{'☆'.repeat(5 - Math.round(job.employer.avgRating))}
+                <span className="text-gray-500 font-normal ml-1">{job.employer.avgRating.toFixed(1)}</span>
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 font-medium mt-0.5">{job.employer.companyName}</p>
           <p className="text-gray-600 text-sm mt-2 line-clamp-2">{job.description}</p>
           <div className="flex flex-wrap gap-3 mt-3 text-sm text-gray-500">

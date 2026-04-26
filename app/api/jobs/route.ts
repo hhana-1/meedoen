@@ -29,7 +29,28 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: 'desc' },
     take: 50,
   })
-  return NextResponse.json(jobs)
+
+  const employerUserIds = [...new Set(jobs.map(j => j.employer.userId))]
+  const ratingAggs = employerUserIds.length > 0
+    ? await prisma.review.groupBy({
+        by: ['toUserId'],
+        _avg: { rating: true },
+        _count: { rating: true },
+        where: { toUserId: { in: employerUserIds }, flagged: false },
+      })
+    : []
+  const ratingMap = Object.fromEntries(
+    ratingAggs.map(r => [r.toUserId, { avg: r._avg.rating, count: r._count.rating }])
+  )
+  const jobsWithRatings = jobs.map(j => ({
+    ...j,
+    employer: {
+      ...j.employer,
+      avgRating: ratingMap[j.employer.userId]?.avg ?? null,
+      reviewCount: ratingMap[j.employer.userId]?.count ?? 0,
+    },
+  }))
+  return NextResponse.json(jobsWithRatings)
 }
 
 export async function POST(req: NextRequest) {
