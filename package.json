@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && node node_modules/next/dist/bin/next build",
-    "start": "node node_modules/next/dist/bin/next start",
-    "postinstall": "prisma generate"
+    "build": "npx prisma generate && node node_modules/next/dist/bin/next build",
+    "start": "node node_modules/next/dist/bin/next start"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
